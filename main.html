@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hue Bulb Replacer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Inter', sans-serif; /* Ensure Inter font is used */
+        }
+        .log-entry {
+            padding: 4px 8px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            word-break: break-word; /* Prevent long messages from overflowing */
+            font-size: 0.875rem; /* Slightly smaller font for logs */
+        }
+        .log-info { background-color: #e0f2fe; color: #0c4a6e; }
+        .log-success { background-color: #dcfce7; color: #166534; }
+        .log-warning { background-color: #fef9c3; color: #854d0e; }
+        .log-error { background-color: #fee2e2; color: #991b1b; }
+        /* Style buttons */
+        button {
+            transition: all 0.2s ease-in-out;
+        }
+        button:not(:disabled):hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+         button:disabled {
+             opacity: 0.6;
+             cursor: not-allowed;
+         }
+        /* Hide debug option by default */
+        #debugOptions { display: none; }
+        /* Ensure select dropdowns are readable */
+        select {
+             background-color: white; /* Ensure background is white */
+             color: black; /* Ensure text is black */
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-4 md:p-8">
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
+
+        <h1 class="text-2xl font-bold mb-4 text-center text-indigo-600">Philips Hue Bulb Replacer</h1>
+
+        <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
+            <h2 class="font-semibold mb-2">Instructions & Preparation:</h2>
+            <ol class="list-decimal list-inside space-y-1">
+                <li>Ensure the NEW bulb is already added via the Hue app (rename it temporarily if needed, e.g., "New Bulb").</li>
+                <li>Find your Bridge IP address and generate an API Username (Key). See Hue developer docs if unsure.</li>
+                <li><strong>Important Security Step:</strong> Before starting, open a new browser tab and go to <code>https://[Your_Bridge_IP]/clip/v2/resource</code> (or <code>.../api/nouser</code>). You'll likely see a security warning. Click "Advanced" and "Proceed" (or similar options) to trust the Bridge's certificate. You only need to do this once per browser.</li>
+                <li>Enter your Bridge IP and API Username below.</li>
+                <li>Click "Fetch Lights" to see available bulbs.</li>
+                <li>Select the OLD bulb (to be replaced) and the NEW bulb (to inherit settings).</li>
+                <li>(Debug Mode) Optionally check the box to keep the old bulb's name and rename the new bulb to "[Original Name] (new)".</li>
+                <li>Confirm and click "Start Replacement".</li>
+            </ol>
+        </div>
+
+        <div id="step1" class="mb-6 p-4 border rounded-md bg-gray-50">
+            <h2 class="text-lg font-semibold mb-3 text-gray-700">Step 1: Connect to Bridge</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="bridgeIp" class="block text-sm font-medium text-gray-700 mb-1">Bridge IP Address:</label>
+                    <input type="text" id="bridgeIp" placeholder="e.g., 192.168.1.100" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="apiUser" class="block text-sm font-medium text-gray-700 mb-1">API Username (Key):</label>
+                    <input type="text" id="apiUser" placeholder="Generated API Key" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+            </div>
+            <button id="fetchLightsBtn" class="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Fetch Lights
+            </button>
+            <p id="step1Error" class="text-red-600 text-sm mt-2"></p>
+        </div>
+
+        <div id="step2" class="mb-6 p-4 border rounded-md bg-gray-50 hidden">
+            <h2 class="text-lg font-semibold mb-3 text-gray-700">Step 2: Select Bulbs</h2>
+             <p class="text-sm text-gray-600 mb-3">Choose the old bulb to replace and the new bulb that will take its place.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="oldLightSelect" class="block text-sm font-medium text-gray-700 mb-1">OLD Bulb (To be replaced):</label>
+                    <select id="oldLightSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">-- Select Old Bulb --</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="newLightSelect" class="block text-sm font-medium text-gray-700 mb-1">NEW Bulb (Inherits settings):</label>
+                    <select id="newLightSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">-- Select New Bulb --</option>
+                    </select>
+                </div>
+            </div>
+            <div id="debugOptions" class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-md">
+                 <label for="debugRenameCheck" class="flex items-center text-sm font-medium text-purple-700">
+                     <input type="checkbox" id="debugRenameCheck" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 mr-2">
+                     DEBUG: Keep OLD bulb name, rename NEW bulb to "[Original Name] (new)" instead.
+                 </label>
+            </div>
+            <div id="confirmation" class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 hidden">
+                Replacing: <strong id="confirmOldName"></strong> (ID: <span id="confirmOldId"></span>)<br>
+                With: <strong id="confirmNewName"></strong> (ID: <span id="confirmNewId"></span>)<br>
+                <strong class="text-red-700">Warning:</strong> The new bulb's current name and settings (if any) will be overwritten.
+                <span id="renameWarningDefault">The old bulb will be renamed to "[Original Name] (old)".</span>
+                <span id="renameWarningDebug" class="hidden">The old bulb will KEEP its name. The new bulb will be renamed to "[Original Name] (new)".</span>
+                Both V1 and V2 API names will be updated.
+            </div>
+            <button id="startReplacementBtn" disabled class="w-full md:w-auto px-4 py-2 bg-green-600 text-white font-semibold rounded-md shadow hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                Confirm and Start Replacement
+            </button>
+             <p id="step2Error" class="text-red-600 text-sm mt-2"></p>
+        </div>
+
+        <div id="step3" class="p-4 border rounded-md bg-gray-50 hidden">
+            <h2 class="text-lg font-semibold mb-3 text-gray-700">Step 3: Progress</h2>
+            <div id="logOutput" class="h-64 overflow-y-auto bg-gray-100 p-3 rounded border border-gray-200 text-sm font-mono">
+                </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const isDebugMode = true; // Set to true to enable debug options, false to hide them
+        const SESSION_STORAGE_IP_KEY = 'hueReplacerBridgeIp';
+        const SESSION_STORAGE_API_KEY = 'hueReplacerApiUser';
+
+        // --- DOM Elements ---
+        const bridgeIpInput = document.getElementById('bridgeIp');
+        const apiUserInput = document.getElementById('apiUser');
+        const fetchLightsBtn = document.getElementById('fetchLightsBtn');
+        const oldLightSelect = document.getElementById('oldLightSelect');
+        const newLightSelect = document.getElementById('newLightSelect');
+        const startReplacementBtn = document.getElementById('startReplacementBtn');
+        const logOutput = document.getElementById('logOutput');
+        const step1Div = document.getElementById('step1');
+        const step2Div = document.getElementById('step2');
+        const step3Div = document.getElementById('step3');
+        const step1Error = document.getElementById('step1Error');
+        const step2Error = document.getElementById('step2Error');
+        const confirmationDiv = document.getElementById('confirmation');
+        const confirmOldName = document.getElementById('confirmOldName');
+        const confirmOldId = document.getElementById('confirmOldId');
+        const confirmNewName = document.getElementById('confirmNewName');
+        const confirmNewId = document.getElementById('confirmNewId');
+        const debugOptionsDiv = document.getElementById('debugOptions'); // Debug container
+        const debugRenameCheck = document.getElementById('debugRenameCheck'); // Debug checkbox
+        const renameWarningDefault = document.getElementById('renameWarningDefault');
+        const renameWarningDebug = document.getElementById('renameWarningDebug');
+
+
+        // --- State Variables ---
+        let bridgeIp = '';
+        let apiUser = '';
+        let apiV1BaseUrl = '';
+        let apiV2BaseUrl = '';
+        /** @type {Record<string, {name: string}> | null} */
+        let allLights = null;
+        /** @type {string | null} */
+        let selectedOldLightId = null;
+        /** @type {string | null} */
+        let selectedNewLightId = null;
+
+        // --- Utility Functions ---
+
+        /**
+         * Logs a message to the progress box.
+         * @param {string} message - The message to log.
+         * @param {'info' | 'success' | 'warning' | 'error'} type - The type of message.
+         */
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            entry.classList.add('log-entry', `log-${type}`);
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight; // Auto-scroll to bottom
+            if (type === 'error') console.error(message);
+            if (type === 'warning') console.warn(message);
+        }
+
+        /** Clears the log output. */
+        function clearLog() {
+            logOutput.innerHTML = '';
+        }
+
+         /**
+         * Makes an API request to the Hue Bridge.
+         * Handles both V1 and V2 style API calls based on the URL structure.
+         * @param {string} url - The FULL API URL endpoint.
+         * @param {string} method - HTTP method ('GET', 'PUT', 'POST', 'DELETE').
+         * @param {object | null} [body=null] - The request body for PUT/POST.
+         * @param {string} [apiUsername=null] - The API username for V2 'hue-application-key' header.
+         * @returns {Promise<any>} - A promise that resolves with the JSON response or rejects on error.
+         */
+        async function apiRequest(url, method, body = null, apiUsername = null) {
+            const options = { method: method, headers: {} };
+            // V2 API requires the key in the header for PUT/POST/DELETE
+            if (url.includes('/clip/v2/') && method !== 'GET' && apiUsername) {
+                 options.headers['hue-application-key'] = apiUsername;
+            }
+            if (body) {
+                options.headers['Content-Type'] = 'application/json';
+                options.body = JSON.stringify(body);
+            }
+            try {
+                const response = await fetch(url, options);
+                // Specific V2 error handling
+                if (response.status === 403 && url.includes('/clip/v2/')) {
+                     throw new Error(`API V2 Forbidden (403): Check if API Username '${apiUsername || '?'}' is valid and whitelisted.`);
+                }
+                 if (response.status === 404 && url.includes('/clip/v2/')) {
+                     throw new Error(`API V2 Not Found (404): Endpoint ${url} does not exist.`);
+                 }
+                // General error handling
+                if (!response.ok) {
+                    let errorDetails = `HTTP error! Status: ${response.status}`;
+                    let errorData = null;
+                    try {
+                         errorData = await response.json();
+                         // Try parsing V1 error format
+                         if (Array.isArray(errorData) && errorData[0]?.error?.description) {
+                             errorDetails += ` - V1 Error: ${errorData[0].error.description}`;
+                         // Try parsing V2 error format
+                         } else if (errorData?.errors && Array.isArray(errorData.errors) && errorData.errors[0]?.description) {
+                             errorDetails += ` - V2 Error: ${errorData.errors[0].description}`;
+                         } else { errorDetails += ` - ${await response.text()}`; } // Fallback to text
+                    } catch (e) { try { errorDetails += ` - ${await response.text()}`; } catch (textErr) {} } // Fallback if JSON parsing fails
+                    throw new Error(errorDetails);
+                }
+                // If response is OK, parse JSON
+                const data = await response.json();
+                // Log potential non-blocking warnings from the API response
+                 if (Array.isArray(data) && data[0]?.error) { log(`API V1 Warning: ${data[0].error.description}`, 'warning'); }
+                 if (data?.errors && Array.isArray(data.errors) && data.errors.length > 0) { log(`API V2 Warning: ${data.errors[0].description}`, 'warning'); }
+                return data;
+            } catch (error) {
+                console.error(`API Request Failed: ${method} ${url}`, error);
+                // Check for network errors (e.g., connection refused, DNS error, CORS, certificate issue)
+                if (error instanceof TypeError && error.message.includes('fetch')) {
+                     throw new Error(`Network Error: Could not connect to bridge at ${url}. Did you trust the certificate? Check IP/Username and network connection.`);
+                }
+                // Re-throw other errors (like the ones created above)
+                throw error;
+            }
+        }
+
+        /** Pauses execution. @param {number} ms - Milliseconds. @returns {Promise<void>} */
+        function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+        /** Updates the confirmation message based on selections and debug checkbox */
+        function updateConfirmation() {
+            selectedOldLightId = oldLightSelect.value;
+            selectedNewLightId = newLightSelect.value;
+            step2Error.textContent = ''; // Clear errors
+
+            if (selectedOldLightId && selectedNewLightId) {
+                if (selectedOldLightId === selectedNewLightId) {
+                    step2Error.textContent = 'Old and New bulb cannot be the same.';
+                    confirmationDiv.classList.add('hidden');
+                    startReplacementBtn.disabled = true;
+                } else {
+                    // Update confirmation text
+                    confirmOldId.textContent = selectedOldLightId;
+                    confirmOldName.textContent = allLights[selectedOldLightId]?.name || 'Unknown';
+                    confirmNewId.textContent = selectedNewLightId;
+                    confirmNewName.textContent = allLights[selectedNewLightId]?.name || 'Unknown';
+
+                    // Toggle rename warning based on debug checkbox state
+                    const useDebugRename = isDebugMode && debugRenameCheck.checked;
+                    renameWarningDefault.classList.toggle('hidden', useDebugRename);
+                    renameWarningDebug.classList.toggle('hidden', !useDebugRename);
+
+                    confirmationDiv.classList.remove('hidden');
+                    startReplacementBtn.disabled = false;
+                }
+            } else {
+                confirmationDiv.classList.add('hidden');
+                startReplacementBtn.disabled = true;
+            }
+        }
+
+        // --- Event Listeners ---
+
+        // Load saved values and set up listeners on DOM ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Show/Hide Debug Options based on flag
+            if (isDebugMode) {
+                debugOptionsDiv.style.display = 'block';
+            }
+
+            // Load saved Bridge IP and API User from sessionStorage
+            const savedIp = sessionStorage.getItem(SESSION_STORAGE_IP_KEY);
+            const savedApiUser = sessionStorage.getItem(SESSION_STORAGE_API_KEY);
+
+            if (savedIp) {
+                bridgeIpInput.value = savedIp;
+                bridgeIp = savedIp; // Update state variable as well
+            }
+            if (savedApiUser) {
+                apiUserInput.value = savedApiUser;
+                apiUser = savedApiUser; // Update state variable
+            }
+
+            // Add listeners to save IP/User on input change
+            bridgeIpInput.addEventListener('input', () => {
+                bridgeIp = bridgeIpInput.value.trim();
+                sessionStorage.setItem(SESSION_STORAGE_IP_KEY, bridgeIp);
+            });
+
+            apiUserInput.addEventListener('input', () => {
+                apiUser = apiUserInput.value.trim();
+                sessionStorage.setItem(SESSION_STORAGE_API_KEY, apiUser);
+            });
+        });
+
+
+        fetchLightsBtn.addEventListener('click', async () => {
+            // Values are already updated by the 'input' listeners and stored in state vars
+            // bridgeIp = bridgeIpInput.value.trim();
+            // apiUser = apiUserInput.value.trim();
+            step1Error.textContent = '';
+
+            if (!bridgeIp || !apiUser) {
+                step1Error.textContent = 'Please enter both Bridge IP and API Username.';
+                return;
+            }
+
+            // Construct base URLs
+            apiV1BaseUrl = `https://${bridgeIp}/api/${apiUser}/`;
+            apiV2BaseUrl = `https://${bridgeIp}/clip/v2/`;
+
+            log(`Attempting to connect to bridge via V1 API: ${apiV1BaseUrl}...`, 'info');
+            fetchLightsBtn.disabled = true;
+            fetchLightsBtn.textContent = 'Fetching...';
+
+            try {
+                // Fetch lights using V1 API (V2 doesn't list V1 IDs easily)
+                const data = await apiRequest(`${apiV1BaseUrl}lights`, 'GET');
+                allLights = data;
+                log('Successfully connected and fetched lights via V1 API.', 'success');
+
+                // Clear previous options
+                oldLightSelect.innerHTML = '<option value="">-- Select Old Bulb --</option>';
+                newLightSelect.innerHTML = '<option value="">-- Select New Bulb --</option>';
+
+                // Populate dropdowns, sorted alphabetically
+                const sortedLightIds = Object.keys(allLights).sort((a, b) => allLights[a].name.localeCompare(allLights[b].name));
+                sortedLightIds.forEach(id => {
+                    const name = allLights[id].name;
+                    const optionOld = document.createElement('option');
+                    optionOld.value = id;
+                    optionOld.textContent = `${name} (ID: ${id})`;
+                    oldLightSelect.appendChild(optionOld);
+
+                    const optionNew = document.createElement('option');
+                    optionNew.value = id;
+                    optionNew.textContent = `${name} (ID: ${id})`;
+                    newLightSelect.appendChild(optionNew);
+                });
+
+                // Show next steps
+                step1Div.classList.add('hidden');
+                step2Div.classList.remove('hidden');
+                step3Div.classList.remove('hidden'); // Show log box
+                clearLog(); // Clear any previous logs
+                log('Select the OLD bulb to replace and the NEW bulb to inherit its settings.', 'info');
+                 if (isDebugMode) {
+                     log('DEBUG MODE ACTIVE: Alternative rename option available.', 'warning');
+                 }
+
+            } catch (error) {
+                log(`Error fetching lights: ${error.message}`, 'error');
+                step1Error.textContent = `Error: ${error.message}. Please check IP, Username, network, and ensure the certificate is trusted in your browser.`;
+                // Clear base URLs on error
+                apiV1BaseUrl = '';
+                apiV2BaseUrl = '';
+            } finally {
+                fetchLightsBtn.disabled = false;
+                fetchLightsBtn.textContent = 'Fetch Lights';
+            }
+        });
+
+        // Update confirmation when selections change or debug checkbox is toggled
+        [oldLightSelect, newLightSelect, debugRenameCheck].forEach(element => {
+             // Use 'input' for checkbox to catch changes immediately
+             const eventType = element.type === 'checkbox' ? 'input' : 'change';
+             element.addEventListener(eventType, updateConfirmation);
+        });
+
+
+        startReplacementBtn.addEventListener('click', async () => {
+            if (!selectedOldLightId || !selectedNewLightId || selectedOldLightId === selectedNewLightId) {
+                 log('Invalid selection. Please select distinct Old and New bulbs.', 'error');
+                return;
+            }
+
+            // Disable controls during operation
+            startReplacementBtn.disabled = true;
+            startReplacementBtn.textContent = 'Working...';
+            oldLightSelect.disabled = true;
+            newLightSelect.disabled = true;
+            debugRenameCheck.disabled = true; // Disable checkbox during operation
+            clearLog();
+
+            const originalOldLightName = allLights[selectedOldLightId].name;
+            const currentNewLightName = allLights[selectedNewLightId].name; // Not used currently, but good to have
+
+            // Determine renaming strategy based on debug mode and checkbox
+            const useDebugRename = isDebugMode && debugRenameCheck.checked;
+
+            let oldBulbTargetName = '';
+            let newBulbTargetName = '';
+
+            if (useDebugRename) {
+                oldBulbTargetName = originalOldLightName; // Keep original name
+                newBulbTargetName = `${originalOldLightName} (new)`;
+                log('DEBUG RENAME ACTIVE:', 'warning');
+                log(` -> Old bulb (${selectedOldLightId}) will KEEP its name: '${oldBulbTargetName}'`, 'warning');
+                log(` -> New bulb (${selectedNewLightId}) will be renamed to: '${newBulbTargetName}'`, 'warning');
+            } else {
+                oldBulbTargetName = `${originalOldLightName} (old)`;
+                newBulbTargetName = originalOldLightName; // Inherit original name
+                log('Standard Rename Process:', 'info');
+                log(` -> Old bulb (${selectedOldLightId}) will be renamed to: '${oldBulbTargetName}'`, 'info');
+                log(` -> New bulb (${selectedNewLightId}) will be renamed to: '${newBulbTargetName}'`, 'info');
+            }
+            log(`(Both V1 & V2 APIs will be updated for names)`, 'info');
+
+
+            try {
+                 // --- Step 1: Find V1 Groups containing the old bulb ---
+                 log('Step 1/4: Finding groups containing the old bulb (V1 API)...', 'info');
+                 const groupsData = await apiRequest(`${apiV1BaseUrl}groups`, 'GET');
+                 const groupsWithOldLight = [];
+                 for (const groupId in groupsData) {
+                     // Check if the 'lights' array exists and includes the old light ID
+                     if (groupsData[groupId].lights?.includes(selectedOldLightId)) {
+                         groupsWithOldLight.push(groupId);
+                     }
+                 }
+                 log(`Found ${groupsWithOldLight.length} V1 groups: [${groupsWithOldLight.join(', ')}]`, 'info');
+
+                 // --- Step 2: Add new bulb to relevant V1 Groups ---
+                 log('Step 2/4: Adding new bulb to relevant groups (V1 API)...', 'info');
+                 for (const groupId of groupsWithOldLight) {
+                     try {
+                         const group = await apiRequest(`${apiV1BaseUrl}groups/${groupId}`, 'GET');
+                         const currentLights = group.lights || [];
+                         if (!currentLights.includes(selectedNewLightId)) {
+                             const updatedLights = [...currentLights, selectedNewLightId];
+                             await apiRequest(`${apiV1BaseUrl}groups/${groupId}`, 'PUT', { lights: updatedLights });
+                             log(` -> Added new bulb ${selectedNewLightId} to V1 group ${groupId} ('${group.name}')`, 'success');
+                         } else { log(` -> New bulb ${selectedNewLightId} already in V1 group ${groupId} ('${group.name}')`, 'info'); }
+                         await sleep(250); // Small delay between API calls
+                     } catch (groupError) { log(` -> Error updating V1 group ${groupId}: ${groupError.message}`, 'error'); }
+                 }
+
+                 // --- Step 3: Copy V1 Scene Lightstates ---
+                 log('Step 3/4: Copying scene lightstates (V1 API)...', 'info');
+                 const scenesData = await apiRequest(`${apiV1BaseUrl}scenes`, 'GET');
+                 const scenesWithOldLight = [];
+                  // First pass: Fetch all scenes and identify relevant ones without modifying yet
+                  for (const sceneId in scenesData) {
+                       try {
+                           // Fetch full scene details to check lightstates and lights array
+                           const scene = await apiRequest(`${apiV1BaseUrl}scenes/${sceneId}`, 'GET');
+                           // Check if old light is in the explicit lights list OR has a specific state defined
+                           if (scene.lights?.includes(selectedOldLightId) || scene.lightstates?.[selectedOldLightId]) {
+                               scenesWithOldLight.push({ id: sceneId, name: scene.name, data: scene }); // Store full data
+                           }
+                       } catch (sceneFetchError) { log(` -> Error fetching details for V1 scene ${sceneId}: ${sceneFetchError.message}`, 'warning'); }
+                       await sleep(50); // Small delay even during fetching
+                  }
+                 log(`Found ${scenesWithOldLight.length} V1 scenes potentially involving the old bulb. Processing modifications...`, 'info');
+
+                 // Second pass: Modify the identified scenes
+                 for (const sceneInfo of scenesWithOldLight) {
+                     const sceneId = sceneInfo.id;
+                     const sceneName = sceneInfo.name || `Scene ${sceneId}`;
+                     const scene = sceneInfo.data; // Use stored data
+                     try {
+                         const oldLightState = scene.lightstates?.[selectedOldLightId];
+                         let sceneModified = false;
+
+                         // Copy light state if it exists for the old bulb
+                         if (oldLightState) {
+                             await apiRequest(`${apiV1BaseUrl}scenes/${sceneId}/lightstates/${selectedNewLightId}`, 'PUT', oldLightState);
+                             log(` -> Copied V1 state from old bulb to new bulb in scene '${sceneName}' (ID: ${sceneId})`, 'success');
+                             sceneModified = true;
+                         } else {
+                             log(` -> Old bulb V1 state not found in scene '${sceneName}' (ID: ${sceneId}), skipping state copy.`, 'info');
+                         }
+
+                         // Add new light to the scene's light list if old was present and new isn't
+                         if (scene.lights?.includes(selectedOldLightId) && !scene.lights?.includes(selectedNewLightId)) {
+                              const updatedLights = [...scene.lights, selectedNewLightId];
+                              try {
+                                   await apiRequest(`${apiV1BaseUrl}scenes/${sceneId}`, 'PUT', { lights: updatedLights });
+                                   log(` -> Added new bulb to V1 light list for scene '${sceneName}' (ID: ${sceneId})`, 'success');
+                                   sceneModified = true;
+                              } catch (sceneLightListError) { log(` -> Failed to add new bulb to V1 light list for scene '${sceneName}' (ID: ${sceneId}): ${sceneLightListError.message}`, 'warning'); }
+                         }
+
+                         if (!sceneModified && !oldLightState) {
+                             log(` -> No modifications needed for scene '${sceneName}' (ID: ${sceneId})`, 'info');
+                         }
+
+                         await sleep(250); // Delay between modifying scenes
+                     } catch (sceneError) { log(` -> Error processing V1 scene '${sceneName}' (ID: ${sceneId}): ${sceneError.message}`, 'error'); }
+                 }
+
+                 // --- Step 4: Rename bulbs (Using determined target names via V1 and V2 APIs) ---
+                 log('Step 4/4: Renaming bulbs (V1 & V2 APIs)...', 'info');
+
+                 // 4a. Rename OLD bulb (or skip if keeping name in debug mode)
+                 if (oldBulbTargetName !== originalOldLightName) {
+                     log(` -> Renaming OLD bulb ID ${selectedOldLightId} to '${oldBulbTargetName}'...`, 'info');
+                     try {
+                         await apiRequest(`${apiV1BaseUrl}lights/${selectedOldLightId}`, 'PUT', { name: oldBulbTargetName });
+                         log(`    - V1 Rename successful.`, 'success');
+                     } catch (v1RenameError) { log(`    - V1 Rename FAILED: ${v1RenameError.message}`, 'error'); }
+                     await sleep(100); // Short pause
+                     try {
+                         // V2 uses /resource/light/{light_id} and requires the key in header
+                         const v2Payload = { metadata: { name: oldBulbTargetName } };
+                         await apiRequest(`${apiV2BaseUrl}resource/light/${selectedOldLightId}`, 'PUT', v2Payload, apiUser);
+                         log(`    - V2 Rename successful.`, 'success');
+                     } catch (v2RenameError) { log(`    - V2 Rename FAILED: ${v2RenameError.message}`, 'error'); }
+                 } else {
+                      log(` -> Skipping rename for OLD bulb ID ${selectedOldLightId} (keeping name '${originalOldLightName}')`, 'info');
+                 }
+
+
+                 await sleep(250); // Pause between renaming bulbs
+
+                 // 4b. Rename NEW bulb
+                 log(` -> Renaming NEW bulb ID ${selectedNewLightId} to '${newBulbTargetName}'...`, 'info');
+                  try {
+                      await apiRequest(`${apiV1BaseUrl}lights/${selectedNewLightId}`, 'PUT', { name: newBulbTargetName });
+                      log(`    - V1 Rename successful.`, 'success');
+                  } catch (v1RenameError) { log(`    - V1 Rename FAILED: ${v1RenameError.message}`, 'error'); }
+                  await sleep(100); // Short pause
+                  try {
+                      // V2 uses /resource/light/{light_id} and requires the key in header
+                      const v2Payload = { metadata: { name: newBulbTargetName } };
+                      await apiRequest(`${apiV2BaseUrl}resource/light/${selectedNewLightId}`, 'PUT', v2Payload, apiUser);
+                      log(`    - V2 Rename successful.`, 'success');
+                  } catch (v2RenameError) { log(`    - V2 Rename FAILED: ${v2RenameError.message}`, 'error'); }
+
+
+                 log('----------------------------------', 'info');
+                 log('Replacement process complete!', 'success');
+                 log('Summary:', 'info');
+                 log(` - Attempted to set New bulb (${selectedNewLightId}) name to '${newBulbTargetName}' (V1 & V2).`, 'info');
+                 log(` - Attempted to set Old bulb (${selectedOldLightId}) name to '${oldBulbTargetName}' (V1 & V2).`, 'info');
+                 log(` - New bulb added to V1 groups: [${groupsWithOldLight.join(', ')}]`, 'info');
+                 log(` - Attempted V1 scene state copy/light list update for scenes involving the old bulb.`, 'info');
+                 log('Please verify in the Hue app and other apps (especially V2 API based ones):', 'warning');
+                 log(' - Check the final names of the bulbs.', 'warning');
+                 log(' - Test the groups and scenes involving the original bulb to ensure the new bulb behaves correctly.', 'warning');
+                 if (!useDebugRename) { // Only suggest deleting if standard rename occurred
+                      log(' - If everything looks good, you can manually delete the bulb named "' + oldBulbTargetName + '" using the Hue app.', 'warning');
+                 } else {
+                       log(' - Since debug rename was used, the original bulb was not renamed to "(old)". No deletion is typically needed unless you intended to fully replace it.', 'warning');
+                 }
+
+
+            } catch (error) {
+                 log(`An critical error occurred during the replacement process: ${error.message}`, 'error');
+                  log('Process stopped. Please review the logs and check your Hue app. Some steps may have completed, others may have failed.', 'error');
+            } finally {
+                 startReplacementBtn.textContent = 'Process Finished';
+                 // Keep controls disabled after completion/error to prevent accidental re-runs without refresh
+                 // oldLightSelect.disabled = false;
+                 // newLightSelect.disabled = false;
+                 // debugRenameCheck.disabled = false;
+            }
+        });
+
+    </script>
+</body>
+</html>
