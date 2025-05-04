@@ -520,6 +520,19 @@
         }
 
 
+        /**
+         * Checks if an identical condition/action address already exists in an array.
+         * @param {Array<object>} itemsArray - The array of conditions or actions.
+         * @param {string} newAddress - The address string to check for.
+         * @returns {boolean} - True if an item with the exact address exists, false otherwise.
+         */
+         function itemAddressExists(itemsArray, newAddress) {
+            if (!itemsArray) return false;
+            return itemsArray.some(item => item && item.address === newAddress);
+        }
+
+        // ---------------------------------------------------------------------------------------------------------------------------------------
+
         startReplacementBtn.addEventListener('click', async () => {
             if (!selectedOldLightV1Id || !selectedNewLightV1Id || selectedOldLightV1Id === selectedNewLightV1Id) {
                  log('Invalid selection. Please select distinct Old and New bulbs.', 'error');
@@ -684,6 +697,99 @@
                      } catch (sceneError) { log(` -> Error processing V1 scene '${sceneName}' (ID: ${sceneId}): ${sceneError.message}`, 'error'); }
                  }
 
+                 // --- Step: Update V1 Rules ---
+                 log('Step X/Y: Checking V1 Rules...', 'info'); // Keep step numbers generic as requested
+                 let allRules = {};
+                 try {
+                     allRules = await apiRequest(`${apiV1BaseUrl}rules`, 'GET');
+                     if (!allRules || typeof allRules !== 'object') {
+                         allRules = {}; // Ensure it's an object even if empty/error
+                         log(' -> Could not fetch or parse V1 rules, or no rules exist.', 'warning');
+                     } else {
+                         log(` -> Fetched ${Object.keys(allRules).length} V1 rules.`, 'info');
+                     }
+                 } catch (ruleError) {
+                      log(` -> Error fetching V1 rules: ${ruleError.message}. Skipping rule update step.`, 'error');
+                      allRules = {}; // Prevent further processing if fetch failed
+                 }
+
+                 let updatedRulesCount = 0;
+                 const oldLightAddressPrefix = `/lights/${selectedOldLightV1Id}/`;
+                 const newLightAddressPrefix = `/lights/${selectedNewLightV1Id}/`;
+
+                 for (const ruleId in allRules) {
+                    if (!Object.prototype.hasOwnProperty.call(allRules, ruleId)) continue;
+
+                    const rule = allRules[ruleId];
+                    let needsUpdate = false;
+                    let modifiedConditions = rule.conditions ? JSON.parse(JSON.stringify(rule.conditions)) : []; // Deep copy or init empty
+                    let modifiedActions = rule.actions ? JSON.parse(JSON.stringify(rule.actions)) : []; // Deep copy or init empty
+
+                    // Check Conditions
+                    if (rule.conditions) {
+                        rule.conditions.forEach(condition => {
+                            if (condition.address && condition.address.startsWith(oldLightAddressPrefix)) {
+                                const addressSuffix = condition.address.substring(oldLightAddressPrefix.length);
+                                const newAddress = newLightAddressPrefix + addressSuffix;
+                                // Check if the exact condition for the new light already exists in the ORIGINAL rule
+                                if (!itemAddressExists(rule.conditions, newAddress)) {
+                                    const newCondition = { ...condition, address: newAddress }; // Create new condition object
+                                    modifiedConditions.push(newCondition);
+                                    log(`    -> Rule ${ruleId}: Adding condition for new light: ${newAddress}`, 'info');
+                                    needsUpdate = true;
+                                } else {
+                                     log(`    -> Rule ${ruleId}: Condition for new light (${newAddress}) already exists.`, 'info');
+                                }
+                            }
+                        });
+                    }
+
+                    // Check Actions
+                    if (rule.actions) {
+                         rule.actions.forEach(action => {
+                            if (action.address && action.address.startsWith(oldLightAddressPrefix)) {
+                                const addressSuffix = action.address.substring(oldLightAddressPrefix.length);
+                                const newAddress = newLightAddressPrefix + addressSuffix;
+                                // Check if the exact action for the new light already exists in the ORIGINAL rule
+                                if (!itemAddressExists(rule.actions, newAddress)) {
+                                    const newAction = { ...action, address: newAddress }; // Create new action object
+                                    modifiedActions.push(newAction);
+                                    log(`    -> Rule ${ruleId}: Adding action for new light: ${newAddress}`, 'info');
+                                    needsUpdate = true;
+                                } else {
+                                    log(`    -> Rule ${ruleId}: Action for new light (${newAddress}) already exists.`, 'info');
+                                }
+                            }
+                        });
+                    }
+
+                    // If modifications were made, PUT the update
+                    if (needsUpdate) {
+                        log(`    -> Rule ${ruleId} ('${rule.name}') requires update. Attempting PUT...`, 'info');
+                        const updatePayload = {};
+                        // Only include conditions/actions if they were actually modified or existed
+                        if (modifiedConditions.length > 0) updatePayload.conditions = modifiedConditions;
+                        if (modifiedActions.length > 0) updatePayload.actions = modifiedActions;
+
+                        if (Object.keys(updatePayload).length > 0) { // Ensure payload isn't empty
+                             try {
+                                await apiRequest(`${apiV1BaseUrl}rules/${ruleId}`, 'PUT', updatePayload);
+                                log(`    -> Successfully updated Rule ${ruleId}.`, 'success');
+                                updatedRulesCount++;
+                            } catch (updateError) {
+                                log(`    -> FAILED to update Rule ${ruleId}: ${updateError.message}`, 'error');
+                            }
+                        } else {
+                             log(`    -> Rule ${ruleId}: Update skipped (no changes detected after processing).`, 'warning');
+                        }
+
+                        await sleep(300); // Delay between rule updates
+                    }
+                 }
+                 log(` -> Finished checking V1 rules. Attempted updates on ${updatedRulesCount} rules.`, 'info');
+
+
+
                  // --- Step 4: Update V2 Behavior Instances (Automations/Timers) ---
                  log('Step 4/7: Checking V2 Automations/Timers (Behavior Instances)...', 'info');
                  let allBehaviorInstances = [];
@@ -811,13 +917,15 @@
                  log('Summary:', 'info');
                  log(` - Attempted to set New bulb (V1 ${selectedNewLightV1Id}) name to '${newBulbTargetName}' (V1 & V2).`, 'info');
                  log(` - Attempted to set Old bulb (V1 ${selectedOldLightV1Id}) name to '${oldBulbTargetName}' (V1 & V2).`, 'info');
-                 log(` - Attempted V2 Behavior Instance updates for Old bulb (${oldLightV2Id}) -> New bulb (${newLightV2Id}). Updated ${updatedInstanceCount} instances.`, 'info'); // Added this line
+                 log(` - Attempted V2 Behavior Instance updates for Old bulb (${oldLightV2Id}) -> New bulb (${newLightV2Id}). Updated ${updatedInstanceCount} instances.`, 'info');
+                 log(` - Attempted V1 Rule updates for Old bulb (${selectedOldLightV1Id}) -> New bulb (${selectedNewLightV1Id}). Processed ${updatedRulesCount} rules.`, 'info'); // <-- ADD THIS LINE
                  log(` - Attempted to apply startup config from Old bulb to New bulb (V1 only).`, 'info');
                  log(` - New bulb added to V1 groups: [${groupsWithOldLight.join(', ')}]`, 'info');
                  log(` - Attempted V1 scene state copy/light list update for scenes involving the old bulb.`, 'info');
                  log('Please verify in the Hue app and other apps (especially V2 API based ones):', 'warning');
                  log(' - Check the final names of the bulbs.', 'warning');
-                 log(' - Check automations/timers involving the old bulb now correctly include/target the new bulb.', 'warning'); // Added verification step
+                 log(' - Check automations/timers involving the old bulb now correctly include/target the new bulb.', 'warning');
+                 log(' - Check V1 Rules involving the old bulb now correctly include/target the new bulb.', 'warning'); // <-- ADD THIS LINE
                  log(' - Check the startup behavior of the new bulb after a power cycle.', 'warning');
                  log(' - Test the groups and scenes involving the original bulb to ensure the new bulb behaves correctly.', 'warning');
                  if (!useDebugRename) { /* ... suggest delete ... */ } else { /* ... debug warning ... */ }
