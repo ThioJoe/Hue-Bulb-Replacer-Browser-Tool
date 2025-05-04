@@ -111,7 +111,7 @@
                 <strong class="text-red-700">Warning:</strong> The new bulb's current name and settings (if any) will be overwritten.
                 <span id="renameWarningDefault">The old bulb will be renamed to "[Original Name] (old)".</span>
                 <span id="renameWarningDebug" class="hidden">The old bulb will KEEP its name. The new bulb will be renamed to "[Original Name] (new)".</span>
-                Both V1 and V2 API names will be updated.
+                Both V1 and V2 API names will be updated. Startup behavior will also be copied (V1 only).
             </div>
             <button id="startReplacementBtn" disabled class="w-full md:w-auto px-4 py-2 bg-green-600 text-white font-semibold rounded-md shadow hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed">
                 Confirm and Start Replacement
@@ -162,14 +162,14 @@
         let apiUser = '';
         let apiV1BaseUrl = '';
         let apiV2BaseUrl = '';
-        /** @type {Record<string, {name: string}> | null} */
-        let allV1Lights = null; // Renamed from allLights for clarity
+        /** @type {Record<string, any> | null} */ // Using 'any' as V1 light object structure is complex
+        let allV1Lights = null;
         /** @type {Record<string, string> | null} */
         let v1ToV2IdMap = null; // Map V1 numeric ID (string) to V2 GUID (string)
         /** @type {string | null} */
-        let selectedOldLightV1Id = null; // Renamed for clarity
+        let selectedOldLightV1Id = null;
         /** @type {string | null} */
-        let selectedNewLightV1Id = null; // Renamed for clarity
+        let selectedNewLightV1Id = null;
 
         // --- Utility Functions ---
 
@@ -217,6 +217,12 @@
             }
 
             try {
+                // Ensure HTTPS is used for all bridge communication
+                if (!url.startsWith('https://')) {
+                    url = url.replace(/^http:/, 'https:');
+                    log(`Corrected URL to use HTTPS: ${url}`, 'warning');
+                }
+
                 const response = await fetch(url, options);
 
                 // Specific V2 error handling
@@ -239,24 +245,42 @@
                          // Try parsing V2 error format
                          } else if (errorData?.errors && Array.isArray(errorData.errors) && errorData.errors[0]?.description) {
                              errorDetails += ` - V2 Error: ${errorData.errors[0].description}`;
-                         } else { errorDetails += ` - ${await response.text()}`; } // Fallback to text
-                    } catch (e) { try { errorDetails += ` - ${await response.text()}`; } catch (textErr) {} } // Fallback if JSON parsing fails
+                         } else {
+                             // Attempt to get text if JSON parsing failed or format is unknown
+                             try { errorDetails += ` - ${await response.text()}`; } catch(textErr){}
+                         }
+                    } catch (e) {
+                        // Fallback if JSON parsing fails completely
+                        try { errorDetails += ` - ${await response.text()}`; } catch (textErr) {}
+                    }
                     throw new Error(errorDetails);
                 }
 
-                // If response is OK, parse JSON
-                const data = await response.json();
+                // If response is OK, attempt to parse JSON
+                // Handle cases where response might be OK but have no content (e.g., successful PUT often returns array)
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const data = await response.json();
+                     // Log potential non-blocking warnings from the API response
+                    if (Array.isArray(data) && data[0]?.error) { log(`API V1 Warning: ${data[0].error.description}`, 'warning'); }
+                    if (data?.errors && Array.isArray(data.errors) && data.errors.length > 0) { log(`API V2 Warning: ${data.errors[0].description}`, 'warning'); }
+                    return data;
+                } else {
+                    // Handle non-JSON successful responses if necessary, otherwise return null or success indicator
+                    log(`Request successful (${response.status}), but response was not JSON.`, 'info');
+                    return { success: true, status: response.status }; // Indicate success
+                }
 
-                // Log potential non-blocking warnings from the API response
-                 if (Array.isArray(data) && data[0]?.error) { log(`API V1 Warning: ${data[0].error.description}`, 'warning'); }
-                 if (data?.errors && Array.isArray(data.errors) && data.errors.length > 0) { log(`API V2 Warning: ${data.errors[0].description}`, 'warning'); }
-
-                return data;
             } catch (error) {
                 console.error(`API Request Failed: ${method} ${url}`, error);
                 // Check for network errors (e.g., connection refused, DNS error, CORS, certificate issue)
                 if (error instanceof TypeError && error.message.includes('fetch')) {
-                     throw new Error(`Network Error: Could not connect to bridge at ${url}. Did you trust the certificate? Check IP/Username and network connection.`);
+                     // Check if it's likely a certificate error specifically for HTTPS
+                     if(url.startsWith('https://')) {
+                        throw new Error(`Network/Certificate Error: Could not connect securely to bridge at ${url}. Did you trust the certificate in your browser (Step 3 in instructions)? Also check IP/Username and network connection.`);
+                     } else {
+                        throw new Error(`Network Error: Could not connect to bridge at ${url}. Check IP/Username and network connection.`);
+                     }
                 }
                 // Re-throw other errors (like the ones created above)
                 throw error;
@@ -344,11 +368,11 @@
                 return;
             }
 
-            // Construct base URLs
+            // Construct base URLs - ALWAYS use HTTPS
             apiV1BaseUrl = `https://${bridgeIp}/api/${apiUser}/`;
             apiV2BaseUrl = `https://${bridgeIp}/clip/v2/`;
 
-            log(`Attempting to connect to bridge...`, 'info');
+            log(`Attempting to connect to bridge via HTTPS...`, 'info');
             fetchLightsBtn.disabled = true;
             fetchLightsBtn.textContent = 'Fetching...';
 
@@ -356,6 +380,9 @@
                 // --- Fetch V1 Lights (Primary source for dropdowns) ---
                 log(`Fetching V1 lights from ${apiV1BaseUrl}lights...`, 'info');
                 const v1Data = await apiRequest(`${apiV1BaseUrl}lights`, 'GET');
+                if (!v1Data || typeof v1Data !== 'object') { // Basic validation
+                     throw new Error('Invalid V1 light data received.');
+                }
                 allV1Lights = v1Data;
                 log(`Successfully fetched ${Object.keys(allV1Lights).length} V1 lights.`, 'success');
 
@@ -444,6 +471,11 @@
                  log('Invalid selection. Please select distinct Old and New bulbs.', 'error');
                  return;
             }
+             if (!allV1Lights || !allV1Lights[selectedOldLightV1Id] || !allV1Lights[selectedNewLightV1Id]) {
+                log('V1 light data is missing. Cannot proceed. Please Fetch Lights again.', 'error');
+                step2Error.textContent = 'Error: V1 light data missing. Fetch lights again.';
+                return;
+            }
             if (!v1ToV2IdMap) {
                 log('V1-to-V2 ID map is missing. Cannot proceed with V2 renaming. Please Fetch Lights again.', 'error');
                 step2Error.textContent = 'Error: V1-to-V2 ID map missing. Fetch lights again.';
@@ -458,15 +490,30 @@
                 log(`Could not find V2 ID for OLD bulb V1 ID: ${selectedOldLightV1Id}. Cannot perform V2 rename for this bulb.`, 'error');
                 step2Error.textContent = `Error: Missing V2 ID for Old Bulb (${selectedOldLightV1Id}).`;
                 // Optionally allow proceeding with only V1 changes, or stop here. Stopping is safer.
-                // return;
+                // return; // Uncomment to stop if V2 ID is missing
             }
              if (!newLightV2Id) {
                 log(`Could not find V2 ID for NEW bulb V1 ID: ${selectedNewLightV1Id}. Cannot perform V2 rename for this bulb.`, 'error');
                 step2Error.textContent = `Error: Missing V2 ID for New Bulb (${selectedNewLightV1Id}).`;
                 // Optionally allow proceeding with only V1 changes, or stop here. Stopping is safer.
-                // return;
+                // return; // Uncomment to stop if V2 ID is missing
             }
             log(`Found V2 IDs - Old: ${oldLightV2Id || 'N/A'}, New: ${newLightV2Id || 'N/A'}`, 'info');
+
+            // --- Get Old Bulb's Startup Config ---
+            let oldStartupConfig = null;
+            try {
+                // Navigate safely through the potentially missing properties
+                oldStartupConfig = allV1Lights[selectedOldLightV1Id]?.config?.startup;
+                if (oldStartupConfig) {
+                    log(`Found startup config for OLD bulb (V1 ${selectedOldLightV1Id}): ${JSON.stringify(oldStartupConfig)}`, 'info');
+                } else {
+                    log(`Startup config not found for OLD bulb (V1 ${selectedOldLightV1Id}). Skipping startup copy.`, 'warning');
+                }
+            } catch (e) {
+                 log(`Error accessing startup config for OLD bulb: ${e.message}. Skipping startup copy.`, 'warning');
+                 oldStartupConfig = null;
+            }
 
 
             // --- Disable controls during operation ---
@@ -503,19 +550,19 @@
 
             try {
                  // --- Step 1: Find V1 Groups containing the old bulb ---
-                 log('Step 1/5: Finding groups containing the old bulb (V1 API)...', 'info');
+                 log('Step 1/6: Finding groups containing the old bulb (V1 API)...', 'info');
                  const groupsData = await apiRequest(`${apiV1BaseUrl}groups`, 'GET');
                  const groupsWithOldLight = [];
                  for (const groupId in groupsData) {
                      // Check if the 'lights' array exists and includes the old light ID
-                     if (groupsData[groupId].lights?.includes(selectedOldLightV1Id)) {
+                     if (groupsData[groupId]?.lights?.includes(selectedOldLightV1Id)) {
                          groupsWithOldLight.push(groupId);
                      }
                  }
                  log(`Found ${groupsWithOldLight.length} V1 groups: [${groupsWithOldLight.join(', ')}]`, 'info');
 
                  // --- Step 2: Add new bulb to relevant V1 Groups ---
-                 log('Step 2/5: Adding new bulb to relevant groups (V1 API)...', 'info');
+                 log('Step 2/6: Adding new bulb to relevant groups (V1 API)...', 'info');
                  for (const groupId of groupsWithOldLight) {
                      try {
                          const group = await apiRequest(`${apiV1BaseUrl}groups/${groupId}`, 'GET');
@@ -530,7 +577,7 @@
                  }
 
                  // --- Step 3: Copy V1 Scene Lightstates ---
-                 log('Step 3/5: Copying scene lightstates (V1 API)...', 'info');
+                 log('Step 3/6: Copying scene lightstates (V1 API)...', 'info');
                  const scenesData = await apiRequest(`${apiV1BaseUrl}scenes`, 'GET');
                  const scenesWithOldLight = [];
                   // First pass: Fetch all scenes and identify relevant ones without modifying yet
@@ -539,7 +586,7 @@
                             // Fetch full scene details to check lightstates and lights array
                             const scene = await apiRequest(`${apiV1BaseUrl}scenes/${sceneId}`, 'GET');
                             // Check if old light is in the explicit lights list OR has a specific state defined
-                            if (scene.lights?.includes(selectedOldLightV1Id) || scene.lightstates?.[selectedOldLightV1Id]) {
+                            if (scene?.lights?.includes(selectedOldLightV1Id) || scene?.lightstates?.[selectedOldLightV1Id]) {
                                 scenesWithOldLight.push({ id: sceneId, name: scene.name, data: scene }); // Store full data
                             }
                        } catch (sceneFetchError) { log(` -> Error fetching details for V1 scene ${sceneId}: ${sceneFetchError.message}`, 'warning'); }
@@ -584,7 +631,7 @@
                  }
 
                  // --- Step 4: Rename OLD bulb (V1 & V2) ---
-                 log('Step 4/5: Renaming OLD bulb...', 'info');
+                 log('Step 4/6: Renaming OLD bulb...', 'info');
                  if (oldBulbTargetName !== originalOldLightName) { // Only rename if target name is different
                      log(` -> Renaming OLD bulb V1 ID ${selectedOldLightV1Id} to '${oldBulbTargetName}'...`, 'info');
                      // V1 Rename
@@ -610,7 +657,7 @@
                  await sleep(250);
 
                  // --- Step 5: Rename NEW bulb (V1 & V2) ---
-                 log('Step 5/5: Renaming NEW bulb...', 'info');
+                 log('Step 5/6: Renaming NEW bulb...', 'info');
                  log(` -> Renaming NEW bulb V1 ID ${selectedNewLightV1Id} to '${newBulbTargetName}'...`, 'info');
                  // V1 Rename
                  try {
@@ -629,6 +676,21 @@
                  } else {
                      log(`    - V2 Rename skipped (V2 ID not found for V1 ID ${selectedNewLightV1Id}).`, 'warning');
                  }
+                 await sleep(250); // Pause after renaming new bulb
+
+                 // --- Step 6: Apply Startup Config to NEW bulb (V1 only) ---
+                 log('Step 6/6: Applying startup configuration to NEW bulb (V1 API)...', 'info');
+                 if (oldStartupConfig) {
+                    try {
+                        // Use the /config endpoint for setting startup behavior
+                        await apiRequest(`${apiV1BaseUrl}lights/${selectedNewLightV1Id}/config`, 'PUT', { startup: { mode: oldStartupConfig.mode } });
+                        log(` -> Successfully applied startup config to NEW bulb (V1 ${selectedNewLightV1Id}).`, 'success');
+                    } catch (startupError) {
+                        log(` -> FAILED to apply startup config to NEW bulb (V1 ${selectedNewLightV1Id}): ${startupError.message}`, 'error');
+                    }
+                 } else {
+                    log(' -> Skipping startup config application (no config found on old bulb).', 'info');
+                 }
 
 
                  // --- Completion Summary ---
@@ -637,10 +699,12 @@
                  log('Summary:', 'info');
                  log(` - Attempted to set New bulb (V1 ${selectedNewLightV1Id}) name to '${newBulbTargetName}' (V1 & V2).`, 'info');
                  log(` - Attempted to set Old bulb (V1 ${selectedOldLightV1Id}) name to '${oldBulbTargetName}' (V1 & V2).`, 'info');
+                 log(` - Attempted to apply startup config from Old bulb to New bulb (V1 only).`, 'info'); // Added this line
                  log(` - New bulb added to V1 groups: [${groupsWithOldLight.join(', ')}]`, 'info');
                  log(` - Attempted V1 scene state copy/light list update for scenes involving the old bulb.`, 'info');
                  log('Please verify in the Hue app and other apps (especially V2 API based ones):', 'warning');
                  log(' - Check the final names of the bulbs.', 'warning');
+                 log(' - Check the startup behavior of the new bulb after a power cycle.', 'warning'); // Added verification step
                  log(' - Test the groups and scenes involving the original bulb to ensure the new bulb behaves correctly.', 'warning');
                  if (!useDebugRename) { // Only suggest deleting if standard rename occurred
                       log(' - If everything looks good, you can manually delete the bulb named "' + oldBulbTargetName + '" using the Hue app.', 'warning');
