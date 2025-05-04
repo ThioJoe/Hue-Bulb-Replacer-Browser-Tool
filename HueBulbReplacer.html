@@ -50,16 +50,32 @@
 
         <h1 class="text-2xl font-bold mb-4 text-center text-indigo-600">Philips Hue Bulb Replacer</h1>
 
+        <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+            <h2 class="font-semibold mb-2 text-red-800">Important Browser Requirement:</h2>
+            <p class="mb-2">
+                To allow this tool to communicate directly with your local Hue Bridge (which uses HTTPS with a self-signed certificate), your browser's standard security features must be temporarily bypassed.
+            </p>
+            <p class="mb-2">
+                You need to launch Google Chrome using a special command that disables these protections <strong>only for that browser session</strong>. Please close this special Chrome window immediately after you finish using this tool.
+            </p>
+            <p class="mb-1">
+                Open the Command Prompt (search for "cmd") or the Run dialog (press Windows Key + R) and execute the following command:
+            </p>
+            <pre class="bg-gray-100 p-2 rounded text-xs text-gray-800 overflow-x-auto"><code>"C:\Program Files\Google\Chrome\Application\chrome.exe" --disable-web-security --ignore-certificate-errors --guest --bwsi --user-data-dir=%LOCALAPPDATA%\Google\TemporaryChromeSession_YouCanDeleteThis</code></pre>
+            <p class="mt-2">
+                This command opens a new, separate Chrome guest window. <strong>Once that window is open, drag the <code>HueBulbReplacer.html</code> file directly onto it to load the tool.</strong> The temporary profile directory it creates can be safely deleted afterwards.
+            </p>
+        </div>
+        
         <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
             <h2 class="font-semibold mb-2">Instructions & Preparation:</h2>
             <ol class="list-decimal list-inside space-y-1">
-                <li>Ensure the NEW bulb is already added via the Hue app (rename it temporarily if needed, e.g., "New Bulb").</li>
-                <li>Find your Bridge IP address and generate an API Username (Key). See Hue developer docs if unsure.</li>
-                <li><strong>Important Security Step:</strong> Before starting, open a new browser tab and go to <code>https://[Your_Bridge_IP]/clip/v2/resource</code> (or <code>.../api/nouser</code>). You'll likely see a security warning. Click "Advanced" and "Proceed" (or similar options) to trust the Bridge's certificate. You only need to do this once per browser.</li>
+                <li>Ensure the NEW bulb is already added via the Hue app (rename it temporarily if you want, e.g., "New Bulb").</li>
+                <li>Find your Bridge IP address and generate an API Username (aka API Key). You can look up tutorials on how to do this.</li>
                 <li>Enter your Bridge IP and API Username below.</li>
                 <li>Click "Fetch Lights" to see available bulbs.</li>
                 <li>Select the OLD bulb (to be replaced) and the NEW bulb (to inherit settings).</li>
-                <li>(Debug Mode) Optionally check the box to keep the old bulb's name and rename the new bulb to "[Original Name] (new)".</li>
+                <li>(Alternate Rename Mode) Optionally check the box to keep the old bulb's name and rename the new bulb to "[Original Name] (new)".</li>
                 <li>Confirm and click "Start Replacement".</li>
             </ol>
         </div>
