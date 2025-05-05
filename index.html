@@ -1,113 +1,118 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hue Bulb Replacer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-</head>
-<body class="bg-gray-100 p-4 md:p-8">
-    <div class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Hue Bulb Replacer</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="stylesheet" href="css/main.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    </head>
+    <body class="bg-gray-100 p-4 md:p-8">
+        <div class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
+            <h1 class="text-2xl font-bold mb-4 text-center text-indigo-600">Philips Hue Bulb Replacer</h1>
 
-        <h1 class="text-2xl font-bold mb-4 text-center text-indigo-600">Philips Hue Bulb Replacer</h1>
-
-        <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
-            <h2 class="font-semibold mb-2 text-red-800">Important Browser Requirement:</h2>
-            <p class="mb-2">
-                To allow this tool to communicate directly with your local Hue Bridge (which uses HTTPS with a self-signed certificate), your browser's standard security features must be temporarily bypassed.
-            </p>
-            <p class="mb-2">
-                You need to launch Google Chrome using a special command that disables these protections <strong>only for that browser session</strong>. Please close this special Chrome window immediately after you finish using this tool.
-            </p>
-            <p class="mb-1">
-                Open the Command Prompt (search for "cmd") or the Run dialog (press Windows Key + R) and execute the following command:
-            </p>
-            <pre class="bg-gray-100 p-2 rounded text-xs text-gray-800 overflow-x-auto"><code>"C:\Program Files\Google\Chrome\Application\chrome.exe" --disable-web-security --ignore-certificate-errors --guest --bwsi --user-data-dir=%LOCALAPPDATA%\Google\TemporaryChromeSession_YouCanDeleteThis</code></pre>
-            <p class="mt-2">
-                This command opens a new, separate Chrome guest window. <strong>Once that window is open, drag the <code>HueBulbReplacer.html</code> file directly onto it to load the tool.</strong> The temporary profile directory it creates can be safely deleted afterwards.
-            </p>
-        </div>
-        
-        <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-            <h2 class="font-semibold mb-2">Instructions & Preparation:</h2>
-            <ol class="list-decimal list-inside space-y-1">
-                <li>Ensure the NEW bulb is already added via the Hue app (rename it temporarily if you want, e.g., "New Bulb").</li>
-                <li>Find your Bridge IP address and generate an API Username (aka API Key). You can look up tutorials on how to do this.</li>
-                <li>Enter your Bridge IP and API Username below.</li>
-                <li>Click "Fetch Lights" to see available bulbs.</li>
-                <li>Select the OLD bulb (to be replaced) and the NEW bulb (to inherit settings).</li>
-                <li>(Alternate Rename Mode) Optionally check the box to keep the old bulb's name and rename the new bulb to "[Original Name] (new)".</li>
-                <li>Confirm and click "Start Replacement".</li>
-            </ol>
-        </div>
-
-        <div id="step1" class="mb-6 p-4 border rounded-md bg-gray-50">
-            <h2 class="text-lg font-semibold mb-3 text-gray-700">Step 1: Connect to Bridge</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label for="bridgeIp" class="block text-sm font-medium text-gray-700 mb-1">Bridge IP Address:</label>
-                    <input type="text" id="bridgeIp" placeholder="e.g., 192.168.1.100" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                </div>
-                <div>
-                    <label for="apiUser" class="block text-sm font-medium text-gray-700 mb-1">API Username (Key):</label>
-                    <input type="text" id="apiUser" placeholder="Generated API Key" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                </div>
+            <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+                <h2 class="font-semibold mb-2 text-red-800">Important Browser Requirement:</h2>
+                <p class="mb-2">
+                    To allow this tool to communicate directly with your local Hue Bridge (which uses HTTPS with a self-signed certificate), your browser's standard security features must be temporarily bypassed.
+                </p>
+                <p class="mb-2">
+                    You need to launch Google Chrome using a special command that disables these protections <strong>only for that browser session</strong>. Please close this special Chrome window immediately after you finish using this
+                    tool.
+                </p>
+                <p class="mb-1">
+                    Open the Command Prompt (search for "cmd") or the Run dialog (press Windows Key + R) and execute the following command:
+                </p>
+                <pre
+                    class="bg-gray-100 p-2 rounded text-xs text-gray-800 overflow-x-auto"
+                ><code>"C:\Program Files\Google\Chrome\Application\chrome.exe" --disable-web-security --ignore-certificate-errors --guest --bwsi --user-data-dir=%LOCALAPPDATA%\Google\TemporaryChromeSession_YouCanDeleteThis</code></pre>
+                <p class="mt-2">
+                    This command opens a new, separate Chrome guest window. <strong>Once that window is open, drag the <code>HueBulbReplacer.html</code> file directly onto it to load the tool.</strong> The temporary profile directory it
+                    creates can be safely deleted afterwards.
+                </p>
             </div>
-            <button id="fetchLightsBtn" class="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                Fetch Lights
-            </button>
-            <p id="step1Error" class="text-red-600 text-sm mt-2"></p>
-        </div>
 
-        <div id="step2" class="mb-6 p-4 border rounded-md bg-gray-50 hidden">
-            <h2 class="text-lg font-semibold mb-3 text-gray-700">Step 2: Select Bulbs</h2>
-             <p class="text-sm text-gray-600 mb-3">Choose the old bulb to replace and the new bulb that will take its place.</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label for="oldLightSelect" class="block text-sm font-medium text-gray-700 mb-1">OLD Bulb (To be replaced):</label>
-                    <select id="oldLightSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                        <option value="">-- Select Old Bulb --</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="newLightSelect" class="block text-sm font-medium text-gray-700 mb-1">NEW Bulb (Inherits settings):</label>
-                    <select id="newLightSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                        <option value="">-- Select New Bulb --</option>
-                    </select>
-                </div>
+            <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
+                <h2 class="font-semibold mb-2">Instructions & Preparation:</h2>
+                <ol class="list-decimal list-inside space-y-1">
+                    <li>Ensure the NEW bulb is already added via the Hue app (rename it temporarily if you want, e.g., "New Bulb").</li>
+                    <li>Find your Bridge IP address and generate an API Username (aka API Key). You can look up tutorials on how to do this.</li>
+                    <li>Enter your Bridge IP and API Username below.</li>
+                    <li>Click "Fetch Lights" to see available bulbs.</li>
+                    <li>Select the OLD bulb (to be replaced) and the NEW bulb (to inherit settings).</li>
+                    <li>(Alternate Rename Mode) Optionally check the box to keep the old bulb's name and rename the new bulb to "[Original Name] (new)".</li>
+                    <li>Confirm and click "Start Replacement".</li>
+                </ol>
             </div>
-            <div id="debugOptions" class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-md">
-                <label for="debugRenameCheck" class="flex items-center text-sm font-medium text-purple-700">
-                    <input type="checkbox" id="debugRenameCheck" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 mr-2">
-                    <strong>Alternate Rename Option:</strong>&nbsp;&nbsp;&nbsp;Keep OLD bulb name, rename NEW bulb to "[Original Name] (new)" instead.
+
+            <div id="step1" class="mb-6 p-4 border rounded-md bg-gray-50">
+                <h2 class="text-lg font-semibold mb-3 text-gray-700">Step 1: Connect to Bridge</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="bridgeIp" class="block text-sm font-medium text-gray-700 mb-1">Bridge IP Address:</label>
+                        <input type="text" id="bridgeIp" placeholder="e.g., 192.168.1.100" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                    </div>
+                    <div>
+                        <label for="apiUser" class="block text-sm font-medium text-gray-700 mb-1">API Username (Key):</label>
+                        <input type="text" id="apiUser" placeholder="Generated API Key" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                    </div>
+                </div>
+                <button id="fetchLightsBtn" class="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Fetch Lights
+                </button>
+                <p id="step1Error" class="text-red-600 text-sm mt-2"></p>
+            </div>
+
+            <div id="step2" class="mb-6 p-4 border rounded-md bg-gray-50 hidden">
+                <h2 class="text-lg font-semibold mb-3 text-gray-700">Step 2: Select Bulbs</h2>
+                <p class="text-sm text-gray-600 mb-3">Choose the old bulb to replace and the new bulb that will take its place.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="oldLightSelect" class="block text-sm font-medium text-gray-700 mb-1">OLD Bulb (To be replaced):</label>
+                        <select id="oldLightSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">-- Select Old Bulb --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="newLightSelect" class="block text-sm font-medium text-gray-700 mb-1">NEW Bulb (Inherits settings):</label>
+                        <select id="newLightSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">-- Select New Bulb --</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="debugOptions" class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-md">
+                    <label for="debugRenameCheck" class="flex items-center text-sm font-medium text-purple-700">
+                        <input type="checkbox" id="debugRenameCheck" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 mr-2" />
+                        <strong>Alternate Rename Option:</strong>&nbsp;&nbsp;&nbsp;Keep OLD bulb name, rename NEW bulb to "[Original Name] (new)" instead.
                     </label>
-            </div>
-            <div id="confirmation" class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 hidden">
-                Replacing: <strong id="confirmOldName"></strong> (V1 ID: <span id="confirmOldId"></span>)<br>
-                With: <strong id="confirmNewName"></strong> (V1 ID: <span id="confirmNewId"></span>)<br>
-                <strong class="text-red-700">Warning:</strong> The new bulb's current name and settings (if any) will be overwritten.
-                <span id="renameWarningDefault">The old bulb will be renamed to "[Original Name] (old)".</span>
-                <span id="renameWarningDebug" class="hidden">The old bulb will KEEP its name. The new bulb will be renamed to "[Original Name] (new)".</span>
-                Both V1 and V2 API names will be updated. Startup behavior will also be copied (V1 only).
-            </div>
-            <button id="startReplacementBtn" disabled class="w-full md:w-auto px-4 py-2 bg-green-600 text-white font-semibold rounded-md shadow hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed">
-                Confirm and Start Replacement
-            </button>
-             <p id="step2Error" class="text-red-600 text-sm mt-2"></p>
-        </div>
-
-        <div id="step3" class="p-4 border rounded-md bg-gray-50 hidden">
-            <h2 class="text-lg font-semibold mb-3 text-gray-700">Step 3: Progress</h2>
-            <div id="logOutput" class="h-64 overflow-y-auto bg-gray-100 p-3 rounded border border-gray-200 text-sm font-mono">
                 </div>
+                <div id="confirmation" class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 hidden">
+                    Replacing: <strong id="confirmOldName"></strong> (V1 ID: <span id="confirmOldId"></span>)<br />
+                    With: <strong id="confirmNewName"></strong> (V1 ID: <span id="confirmNewId"></span>)<br />
+                    <strong class="text-red-700">Warning:</strong> The new bulb's current name and settings (if any) will be overwritten.
+                    <span id="renameWarningDefault">The old bulb will be renamed to "[Original Name] (old)".</span>
+                    <span id="renameWarningDebug" class="hidden">The old bulb will KEEP its name. The new bulb will be renamed to "[Original Name] (new)".</span>
+                    Both V1 and V2 API names will be updated. Startup behavior will also be copied (V1 only).
+                </div>
+                <button
+                    id="startReplacementBtn"
+                    disabled
+                    class="w-full md:w-auto px-4 py-2 bg-green-600 text-white font-semibold rounded-md shadow hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Confirm and Start Replacement
+                </button>
+                <p id="step2Error" class="text-red-600 text-sm mt-2"></p>
+            </div>
+
+            <div id="step3" class="p-4 border rounded-md bg-gray-50 hidden">
+                <h2 class="text-lg font-semibold mb-3 text-gray-700">Step 3: Progress</h2>
+                <div id="logOutput" class="h-64 overflow-y-auto bg-gray-100 p-3 rounded border border-gray-200 text-sm font-mono"></div>
+            </div>
         </div>
 
-    </div>
-
-    <script src="script/app.js"></script>
-</body>
+        <script src="script/app.js"></script>
+    </body>
 </html>
