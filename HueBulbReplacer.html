@@ -292,7 +292,7 @@
                 if (error instanceof TypeError && error.message.includes('fetch')) {
                      // Check if it's likely a certificate error specifically for HTTPS
                      if(url.startsWith('https://')) {
-                        throw new Error(`Network/Certificate Error: Could not connect securely to bridge at ${url}. Did you trust the certificate in your browser (Step 3 in instructions)? Also check IP/Username and network connection.`);
+                        throw new Error(`Network/Certificate Error: Could not connect securely to bridge at ${url}. Did you launch Chrome using the command in the instructions?`);
                      } else {
                         throw new Error(`Network Error: Could not connect to bridge at ${url}. Check IP/Username and network connection.`);
                      }
@@ -456,7 +456,7 @@
 
             } catch (error) {
                 log(`Error fetching lights: ${error.message}`, 'error');
-                step1Error.textContent = `Error: ${error.message}. Please check IP, Username, network, and ensure the certificate is trusted in your browser.`;
+                step1Error.textContent = `Error: ${error.message}. Please check IP, Username, network, and you launched chrome using the command in the instructions.`;
                 // Clear potentially invalid state
                 apiV1BaseUrl = '';
                 apiV2BaseUrl = '';
